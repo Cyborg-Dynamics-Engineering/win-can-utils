@@ -234,7 +234,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 [[package]]
 name = "crosscan"
 version = "0.1.0"
-source = "git+https://github.com/Cyborg-Dynamics-Engineering/cross-can.git#9f1f70ef3dd4b3af20815c94fc12f52dd4808fde"
+source = "git+https://github.com/Cyborg-Dynamics-Engineering/cross-can.git?rev=9f1f70ef3dd4b3af20815c94fc12f52dd4808fde#9f1f70ef3dd4b3af20815c94fc12f52dd4808fde"
 dependencies = [
  "async-trait",
  "serde",
@@ -569,6 +569,19 @@ dependencies = [
  "log",
  "wasi 0.11.1+wasi-snapshot-preview1",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "mio-serial"
+version = "5.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "029e1f407e261176a983a6599c084efd322d9301028055c87174beac71397ba3"
+dependencies = [
+ "log",
+ "mio",
+ "nix 0.29.0",
+ "serialport",
+ "winapi",
 ]
 
 [[package]]
@@ -1077,6 +1090,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-serial"
+version = "5.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa1d5427f11ba7c5e6384521cfd76f2d64572ff29f3f4f7aa0f496282923fdc8"
+dependencies = [
+ "cfg-if",
+ "futures",
+ "log",
+ "mio-serial",
+ "serialport",
+ "tokio",
+]
+
+[[package]]
 name = "unescaper"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1123,6 +1150,7 @@ name = "win_can_utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "clap",
  "crosscan",
  "ctrlc",
@@ -1134,6 +1162,7 @@ dependencies = [
  "serde_json",
  "serialport",
  "tokio",
+ "tokio-serial",
 ]
 
 [[package]]
