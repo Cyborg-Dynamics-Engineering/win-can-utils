@@ -20,6 +20,7 @@ tokio = { version = "1.47.1", features = ["full", "net"] }
 named_pipe = "0.4.1"
 futures = "0.3.31"
 anyhow = "1.0.99"
+bytemuck = "1.23.2"
 
 [package.metadata.wix]
 eula = "LICENSE.rtf"
