@@ -1,5 +1,7 @@
+use crosscan::can::CanFrame;
 use std::io::ErrorKind;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use std::mem;
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -18,7 +20,7 @@ async fn create_server_and_wait(pipe_name: &str) -> std::io::Result<NamedPipeSer
 }
 
 /// Start the IPC reader, creating and waiting for pipe server connection without blocking async runtime
-pub async fn start_ipc_reader(channel_name: String, tx: Sender<String>) -> std::io::Result<()> {
+pub async fn start_ipc_reader(channel_name: String, tx: Sender<Vec<u8>>) -> std::io::Result<()> {
     let pipe_name = format!(r"\\.\pipe\can_{}_in", channel_name);
 
     loop {
@@ -28,16 +30,21 @@ pub async fn start_ipc_reader(channel_name: String, tx: Sender<String>) -> std::
 
         let mut reader = BufReader::new(server);
         loop {
-            let mut line = String::new();
-            reader.read_line(&mut line).await?;
+            let mut buf = vec![0u8; mem::size_of::<CanFrame>()];
 
-            if line.len() == 0 {
-                println!("Pipe closed by client");
-                break;
-            }
-            if tx_clone.send(line).await.is_err() {
-                println!("Receiver closed");
-                break;
+            // Try to read a full frame
+            match reader.read_exact(&mut buf).await {
+                Ok(_) => {
+                    if tx_clone.send(buf).await.is_err() {
+                        println!("Receiver closed");
+                        break;
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                    println!("Pipe closed by client");
+                    break;
+                }
+                Err(e) => return Err(e),
             }
         }
     }
@@ -45,7 +52,7 @@ pub async fn start_ipc_reader(channel_name: String, tx: Sender<String>) -> std::
 
 pub async fn start_ipc_writer(
     channel_name: String,
-    mut rx: Receiver<String>,
+    mut rx: Receiver<Vec<u8>>,
 ) -> std::io::Result<()> {
     let pipe_name = format!(r"\\.\pipe\can_{}_out", channel_name.clone());
     let mut server = create_server_and_wait(&pipe_name).await?;
@@ -53,7 +60,7 @@ pub async fn start_ipc_writer(
     loop {
         match rx.recv().await {
             Some(msg) => {
-                if let Err(e) = server.write_all(msg.as_bytes()).await {
+                if let Err(e) = server.write_all(&msg).await {
                     if e.kind() == ErrorKind::BrokenPipe {
                         println!("Client disconnected from IPC Writer");
 

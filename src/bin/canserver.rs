@@ -104,8 +104,8 @@ async fn main() -> std::io::Result<()> {
     let driver = Arc::new(Mutex::new(driver));
     let shutdown = Arc::new(AtomicBool::new(false));
 
-    let (tx_out_pipe, rx_out_pipe) = mpsc::channel::<String>(100);
-    let (tx_in_pipe, mut rx_in_pipe) = mpsc::channel::<String>(100);
+    let (tx_out_pipe, rx_out_pipe) = mpsc::channel::<Vec<u8>>(100);
+    let (tx_in_pipe, mut rx_in_pipe) = mpsc::channel::<Vec<u8>>(100);
 
     tokio::spawn(win_can_utils::thread_manager_async::start_ipc_reader(
         cli.channel.clone(),
@@ -138,16 +138,12 @@ async fn main() -> std::io::Result<()> {
         match timeout(Duration::from_millis(5), rx_in_pipe.recv()).await {
             Ok(Some(line)) => {
                 // Got a line, process it
-                match serde_json::from_str::<CanFrame>(&line) {
-                    Ok(frame) => {
-                        let mut d = driver.lock().await;
-                        if let Err(e) = d.send_frame(&frame) {
-                            eprintln!("Failed to send CAN frame: {:?}", e);
-                        } else {
-                            println!("Sent CAN frame ID=0x{:X}", frame.id());
-                        }
-                    }
-                    Err(e) => eprintln!("Failed to deserialize CanFrame: {:?}", e),
+                let frame: CanFrame = *bytemuck::from_bytes(&line[..]);
+                let mut d = driver.lock().await;
+                if let Err(e) = d.send_frame(&frame) {
+                    eprintln!("Failed to send CAN frame: {:?}", e);
+                } else {
+                    println!("Sent CAN frame ID=0x{:X}", frame.id());
                 }
             }
             Ok(None) => {
@@ -164,11 +160,7 @@ async fn main() -> std::io::Result<()> {
             match driver.lock().await.read_frames() {
                 Ok(frames) => {
                     for frame in frames {
-                        let mut json = serde_json::to_string(&frame).unwrap_or_default();
-                        json.push('\n');
-
-                        if let Err(_) = tx_out_pipe.try_send(json) {
-                            // If the IPC cannot be written to right now, move on until availble
+                        if let Err(_) = tx_out_pipe.try_send(bytemuck::bytes_of(&frame).to_vec()) {
                             break;
                         }
                     }
